@@ -1,37 +1,55 @@
 import platform
 import datetime
 import time
+import subprocess
+import re
 import matplotlib.pyplot as plt
 
 def convert_to_json(dictionary):
-    return [value for key, value in dictionary.items()]
+    return {'events': [value for key, value in dictionary.items()]}
 
 def plot_data(json):
     # Data to plot
-    labels = [event['app'] for event in json]
-    sizes = [event['time'].total_seconds() for event in json]
+    labels = [event['app'] for event in json['events']]
+    sizes = [event['time'].total_seconds() for event in json['events']]
     # Plot
     plt.pie(sizes, labels=labels, autopct='%1.1f%%')
     plt.axis('equal')
     plt.show()
 
+# remove http:// and route 
+def process_url(url):
+    url = re.sub('^https?://', '', url)
+    url = re.sub('/.*\n', '', url)
+    return url
+
 def main():
-    print("Press Ctrl+c to kill the program")
+    print("Press Ctrl+C to kill the program")
     # if macOS
     if platform.system() == 'Darwin':
         from AppKit import NSWorkspace
 
     last_active_window = "Starting program"
+    last_url = ""
     # dict maps from app name to dict of event, which is {app, time}
     history = {}
     start = datetime.datetime.now()
     while True:
         try:
+            time.sleep(1)
             # credits to https://stackoverflow.com/questions/10266281/obtain-active-window-using-python
             active_window_name = (NSWorkspace.sharedWorkspace()
                                     .activeApplication()['NSApplicationName'])
+            # track url we are on
+            if active_window_name == "Google Chrome":
+                # specific solution to macOS
+                cmd = ['osascript', '-e', 'tell application "Google Chrome" to get URL of active tab of window 0']
+                url = subprocess.run(cmd, stdout=subprocess.PIPE).stdout
+                url = process_url(url.decode('utf-8'))
+                if url != last_url:
+                    print(url)
+                    last_url = url
             if last_active_window != active_window_name:
-                time.sleep(1)  
                 end = datetime.datetime.now()
                 event = {"app": last_active_window, "time": end-start}
                 # try to add to history
@@ -58,7 +76,7 @@ def main():
             del history["Starting program"]
             history_json = convert_to_json(history)
             print(history_json)
-            plot_data(history_json)
+            # plot_data(history_json)
             exit(0)
 
 if __name__ == "__main__":
