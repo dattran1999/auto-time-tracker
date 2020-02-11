@@ -28,7 +28,9 @@ def main():
     # if macOS
     if platform.system() == 'Darwin':
         from AppKit import NSWorkspace
-
+    else:
+        print("Not supported for this OS yet...")
+        exit(1)
     last_active_window = "Starting program"
     last_url = ""
     # dict maps from app name to dict of event, which is {app, time}
@@ -47,9 +49,21 @@ def main():
                 url = subprocess.run(cmd, stdout=subprocess.PIPE).stdout
                 url = process_url(url.decode('utf-8'))
                 if url != last_url:
-                    print(url)
+                    if last_url == "":
+                        last_url = url
+                    end = datetime.datetime.now()
+                    event = {"website": last_url, "time": end-start}
+                    # try to add to history
+                    try:
+                        history[last_url]['time'] += event['time']
+                    # if not in the history yet
+                    except KeyError:
+                        history[last_url] = event
+                    print(event['website'], str(event['time']))
                     last_url = url
-            if last_active_window != active_window_name:
+                    start = datetime.datetime.now()
+                        
+            elif last_active_window != active_window_name:
                 end = datetime.datetime.now()
                 event = {"app": last_active_window, "time": end-start}
                 # try to add to history
@@ -71,7 +85,6 @@ def main():
                 history[active_window_name] = event
             print(event['app'], str(event['time']))
 
-            # TODO: maybe print a summary or something
             # remove the time it takes to start the program
             del history["Starting program"]
             history_json = convert_to_json(history)
